@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>회독 캘린더</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@800&display=swap" rel="stylesheet">
 <style>
   /* ===== 기본 스타일 ===== */
   * { box-sizing: border-box; }
@@ -20,7 +22,7 @@
   main { display: flex; gap: 20px; padding: 20px 24px; align-items: flex-start; flex-wrap: wrap; }
 
   /* ===== 달력 ===== */
-  .calendar { flex: 1 1 760px; background: #fff; border-radius: 10px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  .calendar { flex: 1 1 840px; background: #fff; border-radius: 10px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
   .nav { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
   .nav h2 { margin: 0; font-size: 18px; min-width: 130px; text-align: center; }
   .nav button { border: 1px solid #ccc; background: #fff; border-radius: 6px; padding: 4px 10px; cursor: pointer; }
@@ -32,7 +34,7 @@
   .weekdays div:first-child { color: #d93b3b; }
   .weekdays div:last-child { color: #2f6fd6; }
 
-  .grid { border-top: 1px solid #e3e3e3; border-left: 1px solid #e3e3e3; overflow: hidden; }
+  .grid { border-top: 1px solid #e3e3e3; border-left: 1px solid #e3e3e3; }
   .cell {
     min-height: 112px;
     border-right: 1px solid #e3e3e3;
@@ -44,9 +46,21 @@
   .cell.other { background: #fafafa; }
   .cell.other .num .d { color: #bbb; }
   /* 날짜 + 회독 숫자: 날짜 칸과 과목별 숫자 칸의 위치가 항상 고정 */
-  .num { display: flex; align-items: center; font-size: 13px; padding: 0 4px; margin-bottom: 4px; }
+  .num { display: flex; align-items: center; font-size: 13px; padding: 0 2px 0 4px; margin-bottom: 2px; }
   .num .d { width: 22px; text-align: center; border-radius: 10px; }
-  .num .s { width: 16px; text-align: center; font-weight: bold; cursor: default; }
+  .num .s {
+    position: relative; width: 19px; height: 26px; line-height: 26px; text-align: center; border-radius: 8px;
+    font-family: "Nunito", "Varela Round", "Malgun Gothic", sans-serif;  /* 둥근 글씨체 (인터넷 연결 시 Nunito) */
+    font-size: 16px; font-weight: 800; cursor: default;
+  }
+  .num .s[data-tip]:hover { background: #eef0f5; z-index: 20; }
+  /* 마우스를 올리면 바로 뜨는 설명 말풍선 */
+  .num .s[data-tip]:hover::after {
+    content: attr(data-tip); position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+    margin-top: 4px; padding: 6px 10px; background: #222; color: #fff; border-radius: 8px;
+    font-family: "Malgun Gothic", sans-serif; font-size: 12px; font-weight: normal; line-height: 1.5;
+    white-space: pre; text-align: left; pointer-events: none;
+  }
   .cell.sun .num .d { color: #d93b3b; }
   .cell.sat .num .d { color: #2f6fd6; }
   .cell.today .num .d { background: #222; color: #fff; }
@@ -345,7 +359,7 @@ function renderCalendar() {
       if (rs.length === 0) { slots += '<span class="s"></span>'; continue; }
       const tip = rs.map(r => r.subject + ' ' + nums[r.id] + '회독 · ' + dayOfRound(r, key) + '일차 ('
                               + shortDate(r.start) + '~' + shortDate(r.end) + ')').join('\n');
-      slots += '<span class="s" style="color:' + subj.color + '" title="' + tip + '">' + dayOfRound(rs[0], key) + '</span>';
+      slots += '<span class="s" style="color:' + subj.color + '" data-tip="' + tip + '">' + dayOfRound(rs[0], key) + '</span>';
     }
     cell.innerHTML = '<div class="num"><span class="d">' + cursor.getDate() + '</span>' + slots + '</div>';
     if (key >= MIN_DATE && key <= MAX_DATE) {
