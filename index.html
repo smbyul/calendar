@@ -20,7 +20,7 @@
   main { display: flex; gap: 20px; padding: 20px 24px; align-items: flex-start; flex-wrap: wrap; }
 
   /* ===== 달력 ===== */
-  .calendar { flex: 1 1 640px; background: #fff; border-radius: 10px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  .calendar { flex: 1 1 760px; background: #fff; border-radius: 10px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
   .nav { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
   .nav h2 { margin: 0; font-size: 18px; min-width: 130px; text-align: center; }
   .nav button { border: 1px solid #ccc; background: #fff; border-radius: 6px; padding: 4px 10px; cursor: pointer; }
@@ -34,7 +34,7 @@
 
   .grid { border-top: 1px solid #e3e3e3; border-left: 1px solid #e3e3e3; overflow: hidden; }
   .cell {
-    min-height: 96px;
+    min-height: 112px;
     border-right: 1px solid #e3e3e3;
     border-bottom: 1px solid #e3e3e3;
     padding: 4px 0 6px;
@@ -42,24 +42,15 @@
   }
   .cell:hover { background: #fafbff; }
   .cell.other { background: #fafafa; }
-  .cell.other .num { color: #bbb; }
-  .num { font-size: 13px; padding: 0 6px; margin-bottom: 3px; }
-  .cell.sun .num { color: #d93b3b; }
-  .cell.sat .num { color: #2f6fd6; }
-  .cell.today .num span {
-    background: #222; color: #fff; border-radius: 10px; padding: 1px 6px;
-  }
-
-  /* 회독 막대: 같은 줄(lane)에 놓여서 날짜를 넘어 이어져 보임 */
-  .bar, .spacer { height: 18px; margin-bottom: 2px; }
-  .bar {
-    color: #fff; font-size: 11px; line-height: 18px;
-    white-space: nowrap; padding-left: 4px; cursor: pointer;
-  }
-  .bar:hover { filter: brightness(0.9); }
-  .bar.start { margin-left: 4px; border-top-left-radius: 4px; border-bottom-left-radius: 4px; }
-  .bar.end { margin-right: 4px; border-top-right-radius: 4px; border-bottom-right-radius: 4px; }
-  .bar.label { position: relative; z-index: 1; overflow: visible; }
+  .cell.other .num .d { color: #bbb; }
+  /* 날짜 + 회독 숫자: 날짜 칸과 과목별 숫자 칸의 위치가 항상 고정 */
+  .num { display: flex; align-items: center; font-size: 13px; padding: 0 4px; margin-bottom: 4px; }
+  .num .d { width: 22px; text-align: center; border-radius: 10px; }
+  .num .s { width: 16px; text-align: center; font-weight: bold; cursor: default; }
+  .cell.sun .num .d { color: #d93b3b; }
+  .cell.sat .num .d { color: #2f6fd6; }
+  .cell.today .num .d { background: #222; color: #fff; }
+  .cell.other .num .s { opacity: .45; }
 
   .hint { font-size: 12px; color: #888; margin: 10px 0 0; }
 
@@ -97,9 +88,19 @@
   .primary-btn { padding: 6px 12px; border-radius: 6px; border: 1px solid #222; background: #222; color: #fff; cursor: pointer; }
 
   /* 달력 칸 안의 계획 한 줄 */
-  .note { font-size: 11px; line-height: 16px; margin: 0 4px 1px; padding-left: 4px; border-left: 3px solid var(--c, #999); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #444; }
+  .note { font-size: 12px; line-height: 18px; margin: 0 4px 2px; padding-left: 4px; border-left: 3px solid var(--c, #999); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #111; }
   .note.done { text-decoration: line-through; color: #aaa; }
   .note-more { font-size: 11px; color: #888; margin: 0 4px; padding-left: 7px; }
+
+  /* 날짜 창의 회독 목록 */
+  .sub { margin: 0 0 8px; font-size: 13px; color: #666; }
+  .round-list { list-style: none; margin: 0 0 14px; padding: 0; }
+  .round-list li { display: flex; align-items: center; gap: 6px; padding: 6px 0; border-bottom: 1px solid #f0f0f0; font-size: 13px; flex-wrap: wrap; }
+  .round-list .info { flex: 1 1 100%; }
+  .round-list .empty { color: #aaa; justify-content: center; }
+  .round-list button { padding: 3px 10px; border-radius: 6px; border: 1px solid #ccc; background: #fff; cursor: pointer; font-size: 12px; }
+  .round-list .del { color: #d93b3b; }
+  .new-round { border-top: 1px solid #e3e3e3; padding-top: 12px; }
   .dialog h3 { margin: 0 0 16px; font-size: 17px; }
   .field { margin-bottom: 14px; }
   .field > label { display: block; font-size: 13px; color: #666; margin-bottom: 6px; }
@@ -135,7 +136,7 @@
       <div>일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div>
     </div>
     <div id="grid" class="grid"></div>
-    <p class="hint">날짜를 클릭하면 회독을 추가하고, 막대를 클릭하면 삭제할 수 있어요.</p>
+    <p class="hint">날짜를 클릭하면 계획과 회독을 관리할 수 있어요. 날짜 옆 색 숫자는 회독 며칠째인지예요 (민소·특허·상표 순, 마우스를 올려 보세요).</p>
   </section>
 
   <aside class="summary">
@@ -150,7 +151,7 @@
     <h3 id="modal-title"></h3>
     <div class="tabs">
       <button id="tab-notes" data-tab="notes">📝 계획</button>
-      <button id="tab-round" data-tab="round">📚 회독 추가</button>
+      <button id="tab-round" data-tab="round">📚 회독</button>
     </div>
 
     <!-- 📝 계획 탭 -->
@@ -164,8 +165,12 @@
       <div class="actions"><button id="close-notes">닫기</button></div>
     </div>
 
-    <!-- 📚 회독 추가 탭 -->
+    <!-- 📚 회독 탭 -->
     <div id="panel-round">
+      <h4 class="sub">이 날의 회독</h4>
+      <ul id="round-list" class="round-list"></ul>
+      <div class="new-round">
+      <h4 class="sub">새 회독 추가</h4>
       <div class="field">
         <label>과목</label>
         <div id="subject-buttons" class="subjects"></div>
@@ -179,19 +184,8 @@
         <button id="cancel">취소</button>
         <button id="add" class="primary">추가</button>
       </div>
+      </div>
     </div>
-  </div>
-</div>
-
-<!-- 막대 클릭 창 -->
-<div id="action-modal" class="modal hidden">
-  <div class="dialog">
-    <h3 id="action-title"></h3>
-    <div class="actions" style="justify-content: stretch">
-      <button id="action-continue" class="primary" style="flex:1">이어서 다음 회독</button>
-      <button id="action-delete" style="flex:1; color:#d93b3b">삭제</button>
-    </div>
-    <div class="actions" style="margin-top:10px"><button id="action-cancel">닫기</button></div>
   </div>
 </div>
 
@@ -201,7 +195,10 @@ const SUBJECTS = [
   { name: '민소', color: '#2e9e4f' },  // 초록
   { name: '특허', color: '#d93b3b' },  // 빨강
   { name: '상표', color: '#2f6fd6' },  // 파랑
+  // 4번째 과목(보라)은 나중에 여기 한 줄 추가: { name: '○○', color: '#8a4fd6' },
 ];
+const SLOT_COUNT = Math.max(4, SUBJECTS.length);  // 날짜 옆 회독 숫자 자리 수 (4자리 미리 확보)
+const MAX_NOTES_SHOWN = 4;                        // 달력 칸에 보이는 계획 개수
 const STORAGE_KEY = 'exam-calendar-rounds';
 const NOTES_KEY = 'exam-calendar-notes';
 
@@ -302,19 +299,9 @@ function roundNumbers() {
   return nums;
 }
 
-// 막대가 겹치지 않게 줄(lane) 번호 배정 → 같은 회독은 매일 같은 높이에 표시됨
-function assignLanes() {
-  const lanes = {};
-  const laneEnds = [];  // 각 줄의 마지막 종료일
-  [...rounds]
-    .sort((a, b) => a.start.localeCompare(b.start) || a.id - b.id)
-    .forEach(r => {
-      let i = laneEnds.findIndex(end => end < r.start);
-      if (i === -1) { i = laneEnds.length; }
-      laneEnds[i] = r.end;
-      lanes[r.id] = i;
-    });
-  return lanes;
+// key 날짜가 회독 r의 며칠째인지 (시작일 = 1일차)
+function dayOfRound(r, key) {
+  return Math.round((fromKey(key) - fromKey(r.start)) / 86400000) + 1;
 }
 
 // ===== 화면 그리기 =====
@@ -333,7 +320,6 @@ function renderCalendar() {
   grid.innerHTML = '';
 
   const nums = roundNumbers();
-  const lanes = assignLanes();
   const todayKey = toKey(new Date());
 
   // 달력 첫 칸 = 이번 달 1일이 속한 주의 일요일
@@ -350,46 +336,27 @@ function renderCalendar() {
     if (dow === 0) cell.classList.add('sun');
     if (dow === 6) cell.classList.add('sat');
     if (key === todayKey) cell.classList.add('today');
-    cell.innerHTML = '<div class="num"><span>' + cursor.getDate() + '</span></div>';
+    // 날짜 옆 회독 숫자: 과목마다 자리가 고정 (민소, 특허, 상표, 4번째 예비 자리)
+    const todays = rounds.filter(r => r.start <= key && key <= r.end);
+    let slots = '';
+    for (let s = 0; s < SLOT_COUNT; s++) {
+      const subj = SUBJECTS[s];
+      const rs = subj ? todays.filter(r => r.subject === subj.name) : [];
+      if (rs.length === 0) { slots += '<span class="s"></span>'; continue; }
+      const tip = rs.map(r => r.subject + ' ' + nums[r.id] + '회독 · ' + dayOfRound(r, key) + '일차 ('
+                              + shortDate(r.start) + '~' + shortDate(r.end) + ')').join('\n');
+      slots += '<span class="s" style="color:' + subj.color + '" title="' + tip + '">' + dayOfRound(rs[0], key) + '</span>';
+    }
+    cell.innerHTML = '<div class="num"><span class="d">' + cursor.getDate() + '</span>' + slots + '</div>';
     if (key >= MIN_DATE && key <= MAX_DATE) {
       cell.addEventListener('click', () => openModal(key));
     } else {
       cell.style.cursor = 'default';   // 범위 밖 날짜는 클릭 불가
     }
 
-    // 이 날짜에 걸친 회독들을 줄 번호 순서대로 배치
-    const todays = rounds.filter(r => r.start <= key && key <= r.end);
-    const maxLane = Math.max(-1, ...todays.map(r => lanes[r.id]));
-    for (let lane = 0; lane <= maxLane; lane++) {
-      const r = todays.find(t => lanes[t.id] === lane);
-      if (!r) {
-        const spacer = document.createElement('div');
-        spacer.className = 'spacer';
-        cell.appendChild(spacer);
-        continue;
-      }
-      const label = r.subject + ' ' + nums[r.id] + '회독';
-      const bar = document.createElement('div');
-      bar.className = 'bar';
-      bar.style.background = colorOf(r.subject);
-      bar.title = label + ' (' + shortDate(r.start) + '~' + shortDate(r.end) + ', ' + r.days + '일)';
-      if (key === r.start) bar.classList.add('start');
-      if (key === r.end) bar.classList.add('end');
-      // 글자는 시작일과 매주 일요일에만 표시
-      if (key === r.start || dow === 0) {
-        bar.classList.add('label');
-        bar.textContent = label;
-      }
-      bar.addEventListener('click', (e) => {
-        e.stopPropagation();   // 날짜 칸 클릭(추가 창)으로 넘어가지 않게
-        openActionModal(r, label);
-      });
-      cell.appendChild(bar);
-    }
-
-    // 그날의 계획: 최대 2개만 보여주고 나머지는 "+N개 더"
+    // 그날의 계획: 최대 MAX_NOTES_SHOWN개만 보여주고 나머지는 "+N개 더"
     const dayNotes = notes.filter(n => n.date === key);
-    for (const n of dayNotes.slice(0, 2)) {
+    for (const n of dayNotes.slice(0, MAX_NOTES_SHOWN)) {
       const el = document.createElement('div');
       el.className = 'note' + (n.done ? ' done' : '');
       if (n.subject) el.style.setProperty('--c', colorOf(n.subject));
@@ -397,10 +364,10 @@ function renderCalendar() {
       el.title = n.text;
       cell.appendChild(el);
     }
-    if (dayNotes.length > 2) {
+    if (dayNotes.length > MAX_NOTES_SHOWN) {
       const more = document.createElement('div');
       more.className = 'note-more';
-      more.textContent = '+' + (dayNotes.length - 2) + '개 더';
+      more.textContent = '+' + (dayNotes.length - MAX_NOTES_SHOWN) + '개 더';
       cell.appendChild(more);
     }
 
@@ -454,6 +421,45 @@ function showTab(tab) {
   if (tab === 'notes') {
     renderNotesList();
     document.getElementById('note-text').focus();
+  } else {
+    renderRoundList();
+  }
+}
+
+// ===== 회독 탭: 이 날 걸친 회독 목록 (이어서 / 삭제) =====
+function renderRoundList() {
+  const ul = document.getElementById('round-list');
+  ul.innerHTML = '';
+  const nums = roundNumbers();
+  const list = rounds
+    .filter(r => r.start <= selectedDate && selectedDate <= r.end)
+    .sort((a, b) => SUBJECTS.findIndex(s => s.name === a.subject) - SUBJECTS.findIndex(s => s.name === b.subject));
+  if (list.length === 0) {
+    ul.innerHTML = '<li class="empty">이 날은 진행 중인 회독이 없어요</li>';
+    return;
+  }
+  for (const r of list) {
+    const label = r.subject + ' ' + nums[r.id] + '회독';
+    const li = document.createElement('li');
+
+    const info = document.createElement('span');
+    info.className = 'info';
+    info.innerHTML = '<span class="dot" style="background:' + colorOf(r.subject) + ';display:inline-block"></span> '
+      + '<b>' + label + '</b> · ' + dayOfRound(r, selectedDate) + '일차 (' + shortDate(r.start) + '~' + shortDate(r.end) + ')';
+
+    const cont = document.createElement('button');
+    cont.textContent = '이어서 다음 회독';
+    cont.addEventListener('click', () => continueRound(r));
+
+    const del = document.createElement('button');
+    del.className = 'del';
+    del.textContent = '삭제';
+    del.addEventListener('click', () => deleteRound(r, label));
+
+    li.appendChild(info);
+    li.appendChild(cont);
+    li.appendChild(del);
+    ul.appendChild(li);
   }
 }
 
@@ -577,27 +583,12 @@ function deleteRound(r, label) {
   rounds = rounds.filter(x => x.id !== r.id);
   save();
   render();
+  renderRoundList();
+  updatePreview();
 }
 
-// ===== 막대 클릭 창: 이어서 다음 회독 / 삭제 =====
-let actionRound = null;
-let actionLabel = '';
-
-function openActionModal(r, label) {
-  actionRound = r;
-  actionLabel = label;
-  document.getElementById('action-title').textContent =
-    label + ' (' + shortDate(r.start) + '~' + shortDate(r.end) + ')';
-  document.getElementById('action-modal').classList.remove('hidden');
-}
-
-function closeActionModal() {
-  document.getElementById('action-modal').classList.add('hidden');
-}
-
-function continueRound() {
-  const r = actionRound;
-  closeActionModal();
+// ===== 이어서 다음 회독: 끝난 다음 날로 날짜 창을 다시 열고 과목/일수를 채움 =====
+function continueRound(r) {
   const next = addDays(r.end, 1);   // 끝난 다음 날부터
   if (next > MAX_DATE) {
     alert('다음 회독 시작일이 ' + MAX_MONTH.year + '년 ' + MAX_MONTH.month + '월을 넘어서 추가할 수 없어요.');
@@ -642,17 +633,6 @@ function init() {
     render();
   });
 
-  document.getElementById('action-continue').addEventListener('click', continueRound);
-  document.getElementById('action-delete').addEventListener('click', () => {
-    const r = actionRound, label = actionLabel;
-    closeActionModal();
-    deleteRound(r, label);
-  });
-  document.getElementById('action-cancel').addEventListener('click', closeActionModal);
-  document.getElementById('action-modal').addEventListener('click', (e) => {
-    if (e.target.id === 'action-modal') closeActionModal();
-  });
-
   // 계획 탭: 과목 선택(선택사항) + 탭 버튼 + 추가
   const sel = document.getElementById('note-subject');
   sel.innerHTML = '<option value="">일반</option>' +
@@ -674,7 +654,6 @@ function init() {
   });
   // Enter = 추가, Esc = 닫기
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeActionModal();
     if (document.getElementById('modal').classList.contains('hidden')) return;
     if (e.key === 'Enter' && activeTab === 'round') addRound();
     if (e.key === 'Escape') closeModal();
