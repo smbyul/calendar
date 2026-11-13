@@ -75,8 +75,31 @@
 
   /* ===== 추가 창 (모달) ===== */
   .modal { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: flex; align-items: center; justify-content: center; }
-  .modal.hidden { display: none; }
-  .dialog { background: #fff; border-radius: 12px; padding: 20px 24px; width: 340px; box-shadow: 0 8px 30px rgba(0,0,0,.2); }
+  .dialog { background: #fff; border-radius: 12px; padding: 20px 24px; width: 380px; max-width: 92vw; box-shadow: 0 8px 30px rgba(0,0,0,.2); }
+  .hidden { display: none !important; }
+
+  /* 탭 */
+  .tabs { display: flex; gap: 6px; margin-bottom: 14px; border-bottom: 1px solid #e3e3e3; }
+  .tabs button { border: none; background: none; padding: 8px 12px; cursor: pointer; font-size: 14px; color: #888; border-bottom: 2px solid transparent; }
+  .tabs button.active { color: #222; font-weight: bold; border-bottom-color: #222; }
+
+  /* 계획(메모) */
+  .note-list { list-style: none; margin: 0 0 12px; padding: 0; max-height: 220px; overflow-y: auto; }
+  .note-list li { display: flex; align-items: center; gap: 6px; padding: 6px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
+  .note-list .text { flex: 1; word-break: break-all; }
+  .note-list li.done .text { text-decoration: line-through; color: #aaa; }
+  .note-list .empty { color: #aaa; justify-content: center; }
+  .note-list .icon { border: none; background: none; cursor: pointer; opacity: .6; padding: 2px; }
+  .note-list .icon:hover { opacity: 1; }
+  .note-form { display: flex; gap: 6px; margin-bottom: 14px; }
+  .note-form select { padding: 6px 4px; border: 1px solid #ccc; border-radius: 6px; font-size: 13px; }
+  .note-form input { flex: 1; min-width: 0; padding: 6px 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
+  .primary-btn { padding: 6px 12px; border-radius: 6px; border: 1px solid #222; background: #222; color: #fff; cursor: pointer; }
+
+  /* 달력 칸 안의 계획 한 줄 */
+  .note { font-size: 11px; line-height: 16px; margin: 0 4px 1px; padding-left: 4px; border-left: 3px solid var(--c, #999); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #444; }
+  .note.done { text-decoration: line-through; color: #aaa; }
+  .note-more { font-size: 11px; color: #888; margin: 0 4px; padding-left: 7px; }
   .dialog h3 { margin: 0 0 16px; font-size: 17px; }
   .field { margin-bottom: 14px; }
   .field > label { display: block; font-size: 13px; color: #666; margin-bottom: 6px; }
@@ -125,18 +148,37 @@
 <div id="modal" class="modal hidden">
   <div class="dialog">
     <h3 id="modal-title"></h3>
-    <div class="field">
-      <label>과목</label>
-      <div id="subject-buttons" class="subjects"></div>
+    <div class="tabs">
+      <button id="tab-notes" data-tab="notes">📝 계획</button>
+      <button id="tab-round" data-tab="round">📚 회독 추가</button>
     </div>
-    <div class="field">
-      <label for="days">회독 일수</label>
-      <input type="number" id="days" min="1" value="10"> 일
+
+    <!-- 📝 계획 탭 -->
+    <div id="panel-notes">
+      <ul id="note-list" class="note-list"></ul>
+      <div class="note-form">
+        <select id="note-subject"></select>
+        <input type="text" id="note-text" placeholder="새 계획 입력 후 Enter" maxlength="60">
+        <button id="note-add" class="primary-btn">추가</button>
+      </div>
+      <div class="actions"><button id="close-notes">닫기</button></div>
     </div>
-    <p id="preview"></p>
-    <div class="actions">
-      <button id="cancel">취소</button>
-      <button id="add" class="primary">추가</button>
+
+    <!-- 📚 회독 추가 탭 -->
+    <div id="panel-round">
+      <div class="field">
+        <label>과목</label>
+        <div id="subject-buttons" class="subjects"></div>
+      </div>
+      <div class="field">
+        <label for="days">회독 일수</label>
+        <input type="number" id="days" min="1" value="10"> 일
+      </div>
+      <p id="preview"></p>
+      <div class="actions">
+        <button id="cancel">취소</button>
+        <button id="add" class="primary">추가</button>
+      </div>
     </div>
   </div>
 </div>
@@ -161,6 +203,7 @@ const SUBJECTS = [
   { name: '상표', color: '#2f6fd6' },  // 파랑
 ];
 const STORAGE_KEY = 'exam-calendar-rounds';
+const NOTES_KEY = 'exam-calendar-notes';
 
 // ===== 설정: 달력 범위 (월은 1~12) =====
 const MIN_MONTH = { year: 2026, month: 11 };
@@ -172,6 +215,9 @@ function monthIndex(y, m) { return y * 12 + m; }  // m은 0~11
 // ===== 상태 =====
 // rounds: [{ id, subject, start: 'YYYY-MM-DD', end: 'YYYY-MM-DD', days }]
 let rounds = load();
+// notes: [{ id, date: 'YYYY-MM-DD', text, done, subject: '민소' | ... | null }]
+let notes = loadNotes();
+let activeTab = 'notes';             // 날짜 창의 현재 탭: 'notes' | 'round'
 let viewYear, viewMonth;             // 지금 보고 있는 달 (month는 0~11)
 let selectedDate = null;             // 추가 창에서 선택한 시작일
 let selectedSubject = null;          // 추가 창에서 선택한 과목
@@ -183,6 +229,13 @@ function load() {
 }
 function save() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(rounds));
+}
+function loadNotes() {
+  try { return JSON.parse(localStorage.getItem(NOTES_KEY)) || []; }
+  catch (e) { return []; }
+}
+function saveNotes() {
+  localStorage.setItem(NOTES_KEY, JSON.stringify(notes));
 }
 
 // ===== 제목 개인화: "OOO의 캘린더" =====
@@ -334,6 +387,23 @@ function renderCalendar() {
       cell.appendChild(bar);
     }
 
+    // 그날의 계획: 최대 2개만 보여주고 나머지는 "+N개 더"
+    const dayNotes = notes.filter(n => n.date === key);
+    for (const n of dayNotes.slice(0, 2)) {
+      const el = document.createElement('div');
+      el.className = 'note' + (n.done ? ' done' : '');
+      if (n.subject) el.style.setProperty('--c', colorOf(n.subject));
+      el.textContent = n.text;
+      el.title = n.text;
+      cell.appendChild(el);
+    }
+    if (dayNotes.length > 2) {
+      const more = document.createElement('div');
+      more.className = 'note-more';
+      more.textContent = '+' + (dayNotes.length - 2) + '개 더';
+      cell.appendChild(more);
+    }
+
     grid.appendChild(cell);
     cursor.setDate(cursor.getDate() + 1);
   }
@@ -364,12 +434,96 @@ function openModal(dateKey, preset) {
   selectedDate = dateKey;
   selectedSubject = preset ? preset.subject : null;
   document.getElementById('days').value = preset ? preset.days : 10;
-  document.getElementById('modal-title').textContent = longDate(dateKey) + '부터 회독 시작';
+  document.getElementById('modal-title').textContent = longDate(dateKey);
   document.querySelectorAll('#subject-buttons button').forEach(b => {
     b.classList.toggle('selected', b.textContent === selectedSubject);
   });
   updatePreview();
+  document.getElementById('note-text').value = '';
+  showTab(preset ? 'round' : 'notes');   // 이어서 회독이면 회독 탭, 아니면 계획 탭
   document.getElementById('modal').classList.remove('hidden');
+}
+
+// ===== 날짜 창: 탭 전환 =====
+function showTab(tab) {
+  activeTab = tab;
+  document.getElementById('tab-notes').classList.toggle('active', tab === 'notes');
+  document.getElementById('tab-round').classList.toggle('active', tab === 'round');
+  document.getElementById('panel-notes').classList.toggle('hidden', tab !== 'notes');
+  document.getElementById('panel-round').classList.toggle('hidden', tab !== 'round');
+  if (tab === 'notes') {
+    renderNotesList();
+    document.getElementById('note-text').focus();
+  }
+}
+
+// ===== 계획(메모) =====
+function renderNotesList() {
+  const ul = document.getElementById('note-list');
+  ul.innerHTML = '';
+  const list = notes.filter(n => n.date === selectedDate);
+  if (list.length === 0) {
+    ul.innerHTML = '<li class="empty">아직 계획이 없어요</li>';
+    return;
+  }
+  for (const n of list) {
+    const li = document.createElement('li');
+    if (n.done) li.classList.add('done');
+
+    const check = document.createElement('input');
+    check.type = 'checkbox';
+    check.checked = n.done;
+    check.addEventListener('change', () => { n.done = check.checked; noteChanged(); });
+
+    const text = document.createElement('span');
+    text.className = 'text';
+    text.textContent = n.text;
+
+    li.appendChild(check);
+    if (n.subject) {
+      const dot = document.createElement('span');
+      dot.className = 'dot';
+      dot.style.background = colorOf(n.subject);
+      dot.title = n.subject;
+      li.appendChild(dot);
+    }
+    li.appendChild(text);
+    li.appendChild(makeIcon('✏️', '수정', () => {
+      const t = prompt('계획 수정', n.text);
+      if (t !== null && t.trim()) { n.text = t.trim(); noteChanged(); }
+    }));
+    li.appendChild(makeIcon('🗑', '삭제', () => {
+      notes = notes.filter(x => x.id !== n.id);
+      noteChanged();
+    }));
+    ul.appendChild(li);
+  }
+}
+
+function makeIcon(label, title, onClick) {
+  const b = document.createElement('button');
+  b.className = 'icon';
+  b.textContent = label;
+  b.title = title;
+  b.addEventListener('click', onClick);
+  return b;
+}
+
+function noteChanged() {
+  saveNotes();
+  renderNotesList();
+  renderCalendar();
+}
+
+function addNote() {
+  const input = document.getElementById('note-text');
+  const text = input.value.trim();
+  if (!text) return;
+  const subject = document.getElementById('note-subject').value || null;
+  notes.push({ id: Date.now(), date: selectedDate, text: text, done: false, subject: subject });
+  input.value = '';
+  noteChanged();
+  input.focus();
 }
 
 function closeModal() {
@@ -499,6 +653,18 @@ function init() {
     if (e.target.id === 'action-modal') closeActionModal();
   });
 
+  // 계획 탭: 과목 선택(선택사항) + 탭 버튼 + 추가
+  const sel = document.getElementById('note-subject');
+  sel.innerHTML = '<option value="">일반</option>' +
+    SUBJECTS.map(s => '<option value="' + s.name + '">' + s.name + '</option>').join('');
+  document.getElementById('tab-notes').addEventListener('click', () => showTab('notes'));
+  document.getElementById('tab-round').addEventListener('click', () => showTab('round'));
+  document.getElementById('note-add').addEventListener('click', addNote);
+  document.getElementById('note-text').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.isComposing) addNote();   // 한글 입력 중 Enter 중복 방지
+  });
+  document.getElementById('close-notes').addEventListener('click', closeModal);
+
   document.getElementById('days').addEventListener('input', updatePreview);
   document.getElementById('add').addEventListener('click', addRound);
   document.getElementById('cancel').addEventListener('click', closeModal);
@@ -510,7 +676,7 @@ function init() {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closeActionModal();
     if (document.getElementById('modal').classList.contains('hidden')) return;
-    if (e.key === 'Enter') addRound();
+    if (e.key === 'Enter' && activeTab === 'round') addRound();
     if (e.key === 'Escape') closeModal();
   });
 
