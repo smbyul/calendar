@@ -69,7 +69,15 @@
   .hint { font-size: 12px; color: #888; margin: 10px 0 0; }
 
   /* ===== 회독 현황 ===== */
-  .summary { flex: 0 1 260px; background: #fff; border-radius: 10px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  .side { flex: 0 1 260px; display: flex; flex-direction: column; gap: 16px; }
+  .summary, .monthplan { background: #fff; border-radius: 10px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  .monthplan h3 { margin: 0 0 10px; font-size: 16px; }
+  .mp-row { display: flex; align-items: center; gap: 6px; padding: 3px 0; border-bottom: 1px dashed #eee; }
+  .mp-row input[type=checkbox] { flex-shrink: 0; width: 16px; height: 16px; cursor: pointer; }
+  .mp-row input[type=text] { flex: 1; min-width: 0; border: none; outline: none; font-size: 14px; padding: 4px 2px; background: transparent; font-family: inherit; }
+  .mp-row input[type=text]:focus { background: #f6f7fb; border-radius: 4px; }
+  .mp-row.done input[type=text] { text-decoration: line-through; color: #aaa; }
+  .mp-hint { font-size: 11px; color: #999; margin: 8px 0 0; }
   .summary h3 { margin: 0 0 12px; font-size: 16px; }
   .summary ul { list-style: none; margin: 0; padding: 0; }
   .summary li { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid #eee; font-size: 14px; }
@@ -153,9 +161,16 @@
     <p class="hint">날짜를 클릭하면 계획과 회독을 관리할 수 있어요. 날짜 옆 색 숫자는 회독 며칠째인지예요 (민소·특허·상표 순, 마우스를 올려 보세요).</p>
   </section>
 
-  <aside class="summary">
-    <h3>회독 현황</h3>
-    <ul id="summary"></ul>
+  <aside class="side">
+    <div class="summary">
+      <h3>회독 현황</h3>
+      <ul id="summary"></ul>
+    </div>
+    <div class="monthplan">
+      <h3 id="mp-title"></h3>
+      <div id="mp-list"></div>
+      <p class="mp-hint">Enter: 다음 줄 · 빈 줄에서 Backspace: 줄 지우기</p>
+    </div>
   </aside>
 </main>
 
@@ -215,6 +230,7 @@ const SLOT_COUNT = Math.max(4, SUBJECTS.length);  // 날짜 옆 회독 숫자 �
 const MAX_NOTES_SHOWN = 4;                        // 달력 칸에 보이는 계획 개수
 const STORAGE_KEY = 'exam-calendar-rounds';
 const NOTES_KEY = 'exam-calendar-notes';
+const MONTH_PLAN_KEY = 'exam-calendar-month-plans';
 
 // ===== 설정: 달력 범위 (월은 1~12) =====
 const MIN_MONTH = { year: 2026, month: 11 };
@@ -228,7 +244,8 @@ function monthIndex(y, m) { return y * 12 + m; }  // m은 0~11
 let rounds = load();
 // notes: [{ id, date: 'YYYY-MM-DD', text, done, subject: '민소' | ... | null }]
 let notes = loadNotes();
-let activeTab = 'notes';             // 날짜 창의 현재 탭: 'notes' | 'round'
+let monthPlans = loadMonthPlans();   // 월간 계획 (아래 월간 계획 부분 참고)
+let activeTab = 'notes';            // 날짜 창의 현재 탭: 'notes' | 'round'
 let viewYear, viewMonth;             // 지금 보고 있는 달 (month는 0~11)
 let selectedDate = null;             // 추가 창에서 선택한 시작일
 let selectedSubject = null;          // 추가 창에서 선택한 과목
@@ -244,6 +261,10 @@ function save() {
 function loadNotes() {
   try { return JSON.parse(localStorage.getItem(NOTES_KEY)) || []; }
   catch (e) { return []; }
+}
+function loadMonthPlans() {
+  try { return JSON.parse(localStorage.getItem(MONTH_PLAN_KEY)) || {}; }
+  catch (e) { return {}; }
 }
 function saveNotes() {
   localStorage.setItem(NOTES_KEY, JSON.stringify(notes));
@@ -322,6 +343,74 @@ function dayOfRound(r, key) {
 function render() {
   renderCalendar();
   renderSummary();
+  renderMonthPlan();
+}
+
+// ===== 월간 계획: 보고 있는 달마다 한 줄씩 적는 체크 목록 =====
+// monthPlans: { 'YYYY-MM': [{ text, done }, ...] }
+function monthKey() {
+  return viewYear + '-' + String(viewMonth + 1).padStart(2, '0');
+}
+
+function saveMonthPlans() {
+  const out = {};
+  for (const k in monthPlans) {
+    const items = monthPlans[k].filter(it => it.text.trim());   // 빈 줄은 저장하지 않음
+    if (items.length) out[k] = items;
+  }
+  try { localStorage.setItem(MONTH_PLAN_KEY, JSON.stringify(out)); } catch (e) {}
+}
+
+function renderMonthPlan() {
+  document.getElementById('mp-title').textContent = (viewMonth + 1) + '월 계획';
+  const key = monthKey();
+  if (!monthPlans[key] || monthPlans[key].length === 0) monthPlans[key] = [{ text: '', done: false }];
+  const items = monthPlans[key];
+  const box = document.getElementById('mp-list');
+  box.innerHTML = '';
+
+  items.forEach((it, i) => {
+    const row = document.createElement('div');
+    row.className = 'mp-row' + (it.done ? ' done' : '');
+
+    const check = document.createElement('input');
+    check.type = 'checkbox';
+    check.checked = it.done;
+    check.addEventListener('change', () => {
+      it.done = check.checked;
+      row.classList.toggle('done', it.done);
+      saveMonthPlans();
+    });
+
+    const text = document.createElement('input');
+    text.type = 'text';
+    text.value = it.text;
+    text.maxLength = 80;
+    text.addEventListener('input', () => { it.text = text.value; saveMonthPlans(); });
+    text.addEventListener('keydown', (e) => {
+      if (e.isComposing) return;   // 한글 입력 중에는 무시
+      if (e.key === 'Enter') {
+        items.splice(i + 1, 0, { text: '', done: false });
+        renderMonthPlan();
+        focusMonthRow(i + 1);
+      } else if (e.key === 'Backspace' && text.value === '' && items.length > 1) {
+        e.preventDefault();
+        items.splice(i, 1);
+        saveMonthPlans();
+        renderMonthPlan();
+        focusMonthRow(Math.max(0, i - 1));
+      }
+    });
+
+    row.appendChild(check);
+    row.appendChild(text);
+    box.appendChild(row);
+  });
+}
+
+function focusMonthRow(i) {
+  const inputs = document.querySelectorAll('#mp-list input[type=text]');
+  if (inputs[i]) inputs[i].focus();
 }
 
 function renderCalendar() {
