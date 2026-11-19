@@ -136,6 +136,12 @@
   .round-list .empty { color: #aaa; justify-content: center; }
   .round-list button { padding: 3px 10px; border-radius: 6px; border: 1px solid #ccc; background: #fff; cursor: pointer; font-size: 12px; }
   .round-list .del { color: #d93b3b; }
+  .edit-box { flex: 1 1 100%; background: #f6f7fb; border-radius: 8px; padding: 8px 10px; font-size: 12px; }
+  .edit-box input { padding: 4px 6px; border: 1px solid #ccc; border-radius: 6px; font-size: 13px; font-family: inherit; }
+  .edit-box .e-days { width: 56px; }
+  .edit-box .e-preview { margin: 8px 0; min-height: 18px; }
+  .edit-box .e-actions { display: flex; justify-content: flex-end; gap: 6px; }
+  .edit-box .e-save:disabled { background: #aaa; border-color: #aaa; cursor: not-allowed; }
   .new-round { border-top: 1px solid #e3e3e3; padding-top: 12px; }
   .dialog h3 { margin: 0 0 16px; font-size: 17px; }
   .field { margin-bottom: 14px; }
@@ -275,6 +281,7 @@ let activeTab = 'notes';            // 날짜 창의 현재 탭: 'notes' | 'roun
 let viewYear, viewMonth;             // 지금 보고 있는 달 (month는 0~11)
 let selectedDate = null;             // 추가 창에서 선택한 시작일
 let selectedSubject = null;          // 추가 창에서 선택한 과목
+let editingRoundId = null;           // 회독 탭에서 수정 칸이 펼쳐진 회독
 
 // ===== 저장/불러오기 (브라우저 localStorage) =====
 function load() {
@@ -614,6 +621,7 @@ function renderSummary() {
 // preset: { subject, days } 를 주면 과목과 일수를 미리 채움 (이어서 회독용)
 function openModal(dateKey, preset) {
   selectedDate = dateKey;
+  editingRoundId = null;
   selectedSubject = preset ? preset.subject : null;
   document.getElementById('days').value = preset ? preset.days : 10;
   document.getElementById('modal-title').textContent = longDate(dateKey);
@@ -683,6 +691,13 @@ function renderRoundList() {
     cont.textContent = '이어서 다음 회독';
     cont.addEventListener('click', () => continueRound(r));
 
+    const edit = document.createElement('button');
+    edit.textContent = '수정';
+    edit.addEventListener('click', () => {
+      editingRoundId = (editingRoundId === r.id) ? null : r.id;   // 다시 누르면 접기
+      renderRoundList();
+    });
+
     const del = document.createElement('button');
     del.className = 'del';
     del.textContent = '삭제';
@@ -690,9 +705,79 @@ function renderRoundList() {
 
     li.appendChild(info);
     li.appendChild(cont);
+    li.appendChild(edit);
     li.appendChild(del);
+    if (editingRoundId === r.id) li.appendChild(buildEditBox(r));
     ul.appendChild(li);
   }
+}
+
+// ===== 회독 수정: 시작일과 일수만 바꾸고 종료일은 자동 계산 =====
+function buildEditBox(r) {
+  const box = document.createElement('div');
+  box.className = 'edit-box';
+  box.innerHTML = '<label>시작일 <input type="date" class="e-start"></label> '
+    + '<label>일수 <input type="number" class="e-days" min="1"> 일</label>'
+    + '<p class="e-preview"></p>'
+    + '<div class="e-actions"><button class="e-cancel">취소</button><button class="e-save primary-btn">저장</button></div>';
+  const startIn = box.querySelector('.e-start');
+  const daysIn = box.querySelector('.e-days');
+  const preview = box.querySelector('.e-preview');
+  const saveBtn = box.querySelector('.e-save');
+  startIn.min = MIN_DATE;
+  startIn.max = MAX_DATE;
+  startIn.value = r.start;
+  daysIn.value = r.days;
+
+  function update() {
+    const start = startIn.value;
+    const days = parseInt(daysIn.value, 10);
+    if (!DATE_RE.test(start) || start < MIN_DATE || start > MAX_DATE || !(days >= 1)) {
+      preview.textContent = '시작일(' + MIN_MONTH.year + '년 ' + MIN_MONTH.month + '월~' + MAX_MONTH.year + '년 ' + MAX_MONTH.month + '월)과 일수를 확인하세요.';
+      saveBtn.disabled = true;
+      return;
+    }
+    const realStart = nextStudyDay(r.subject, start);
+    const end = calcEnd(realStart, days, r.subject);
+    preview.innerHTML = (realStart !== start ? shortDate(start) + '은 ' + r.subject + ' 휴일이라 <b>' + shortDate(realStart) + '</b>부터 시작<br>' : '')
+      + '→ 종료일: <b>' + longDate(end) + '</b> (뒤 회독은 같이 이동)';
+    if (end > MAX_DATE) {
+      preview.innerHTML += '<br><span style="color:#d93b3b">⚠ ' + MAX_MONTH.year + '년 ' + MAX_MONTH.month + '월을 넘어요.</span>';
+      saveBtn.disabled = true;
+      return;
+    }
+    saveBtn.disabled = false;
+  }
+  startIn.addEventListener('input', update);
+  daysIn.addEventListener('input', update);
+  box.querySelector('.e-cancel').addEventListener('click', () => { editingRoundId = null; renderRoundList(); });
+  saveBtn.addEventListener('click', () => {
+    if (!applyRoundEdit(r.id, startIn.value, parseInt(daysIn.value, 10))) return;
+    editingRoundId = null;
+    save();
+    render();
+    renderRoundList();
+    updatePreview();
+  });
+  update();
+  return box;
+}
+
+// 시작일/일수를 바꾸고 종료일 재계산 + 같은 과목 뒤 회독 이동. 범위를 넘으면 되돌리고 false
+function applyRoundEdit(id, start, days) {
+  const backup = JSON.stringify(rounds);
+  const r = rounds.find(x => x.id === id);
+  if (!r) return false;
+  r.start = start;
+  r.days = days;
+  // r.end는 옛 값 그대로 둠: reflowRounds가 뒤 회독이 얼마나 밀릴지 계산할 때 필요
+  reflowRounds();
+  if (rounds.some(x => x.end > MAX_DATE)) {
+    rounds = JSON.parse(backup);
+    alert('이렇게 수정하면 회독이 ' + MAX_MONTH.year + '년 ' + MAX_MONTH.month + '월을 넘어가서 적용할 수 없어요.');
+    return false;
+  }
+  return true;
 }
 
 // ===== 계획(메모) =====
