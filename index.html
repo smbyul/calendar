@@ -205,8 +205,8 @@
   <div class="dialog">
     <h3 id="modal-title"></h3>
     <div class="tabs">
-      <button id="tab-notes" data-tab="notes">📝 계획</button>
       <button id="tab-round" data-tab="round">📚 회독</button>
+      <button id="tab-notes" data-tab="notes">📝 계획</button>
     </div>
 
     <!-- 📝 계획 탭 -->
@@ -631,7 +631,7 @@ function openModal(dateKey, preset) {
   });
   updatePreview();
   document.getElementById('note-text').value = '';
-  showTab(preset ? 'round' : 'notes');   // 이어서 회독이면 회독 탭, 아니면 계획 탭
+  showTab('round');   // 날짜를 클릭하면 회독 탭이 먼저 열림
   document.getElementById('modal').classList.remove('hidden');
 }
 
@@ -1086,8 +1086,7 @@ function init() {
 
   // 계획 탭: 과목 선택(선택사항) + 탭 버튼 + 추가
   const sel = document.getElementById('note-subject');
-  sel.innerHTML = '<option value="">일반</option>' +
-    SUBJECTS.map(s => '<option value="' + s.name + '">' + s.name + '</option>').join('');
+  sel.innerHTML = SUBJECTS.map(s => '<option value="' + s.name + '">' + s.name + '</option>').join('');
   document.getElementById('tab-notes').addEventListener('click', () => showTab('notes'));
   document.getElementById('tab-round').addEventListener('click', () => showTab('round'));
   document.getElementById('note-add').addEventListener('click', addNote);
