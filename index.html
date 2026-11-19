@@ -52,7 +52,7 @@
   .num { display: flex; align-items: center; font-size: 13px; padding: 0 2px 0 4px; margin-bottom: 2px; }
   .num .d { width: 22px; text-align: center; border-radius: 10px; }
   .num .s {
-    position: relative; width: 19px; height: 26px; line-height: 26px; text-align: center; border-radius: 8px;
+    position: relative; width: 28px; height: 26px; line-height: 26px; text-align: center; border-radius: 8px;
     font-family: "Nunito", "Varela Round", "Malgun Gothic", sans-serif;  /* 둥근 글씨체 (인터넷 연결 시 Nunito) */
     font-size: 16px; font-weight: 800; cursor: default;
   }
@@ -254,9 +254,9 @@ const SUBJECTS = [
   { name: '민소', color: '#2e9e4f' },  // 초록
   { name: '특허', color: '#d93b3b' },  // 빨강
   { name: '상표', color: '#2f6fd6' },  // 파랑
-  // 4번째 과목(보라)은 나중에 여기 한 줄 추가: { name: '○○', color: '#8a4fd6' },
+  // 과목을 더 추가하려면 여기 한 줄 추가 (숫자 자리도 자동으로 늘어남): { name: '○○', color: '#8a4fd6' },
 ];
-const SLOT_COUNT = Math.max(4, SUBJECTS.length);  // 날짜 옆 회독 숫자 자리 수 (4자리 미리 확보)
+const SLOT_COUNT = SUBJECTS.length;               // 날짜 옆 회독 숫자 자리 수 (과목 수만큼)
 const MAX_NOTES_SHOWN = 4;                        // 달력 칸에 보이는 계획 개수
 const STORAGE_KEY = 'exam-calendar-rounds';
 const NOTES_KEY = 'exam-calendar-notes';
