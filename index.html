@@ -53,6 +53,9 @@
     font-family: "Nunito", "Varela Round", "Malgun Gothic", sans-serif;  /* 둥근 글씨체 (인터넷 연결 시 Nunito) */
     font-size: 16px; font-weight: 800; cursor: default;
   }
+  .num .s.off { font-size: 13px; opacity: .55; }
+  .off-chips { margin-bottom: 14px; }
+  .off-chips button { padding: 5px 0; font-size: 13px; }
   .num .s[data-tip]:hover { background: #eef0f5; z-index: 20; }
   /* 마우스를 올리면 바로 뜨는 설명 말풍선 */
   .num .s[data-tip]:hover::after {
@@ -196,6 +199,8 @@
 
     <!-- 📚 회독 탭 -->
     <div id="panel-round">
+      <h4 class="sub">이 날 쉬는 과목 (누르면 휴일)</h4>
+      <div id="off-chips" class="subjects off-chips"></div>
       <h4 class="sub">이 날의 회독</h4>
       <ul id="round-list" class="round-list"></ul>
       <div class="new-round">
@@ -231,6 +236,7 @@ const MAX_NOTES_SHOWN = 4;                        // 달력 칸에 보이는 계
 const STORAGE_KEY = 'exam-calendar-rounds';
 const NOTES_KEY = 'exam-calendar-notes';
 const MONTH_PLAN_KEY = 'exam-calendar-month-plans';
+const OFF_KEY = 'exam-calendar-off-days';
 
 // ===== 설정: 달력 범위 (월은 1~12) =====
 const MIN_MONTH = { year: 2026, month: 11 };
@@ -244,6 +250,8 @@ function monthIndex(y, m) { return y * 12 + m; }  // m은 0~11
 let rounds = load();
 // notes: [{ id, date: 'YYYY-MM-DD', text, done, subject: '민소' | ... | null }]
 let notes = loadNotes();
+// offDays: { '민소': { 'YYYY-MM-DD': true, ... }, ... }  과목별 쉬는 날
+let offDays = loadOff();
 let monthPlans = loadMonthPlans();   // 월간 계획 (아래 월간 계획 부분 참고)
 let activeTab = 'notes';            // 날짜 창의 현재 탭: 'notes' | 'round'
 let viewYear, viewMonth;             // 지금 보고 있는 달 (month는 0~11)
@@ -257,6 +265,13 @@ function load() {
 }
 function save() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(rounds));
+}
+function loadOff() {
+  try { return JSON.parse(localStorage.getItem(OFF_KEY)) || {}; }
+  catch (e) { return {}; }
+}
+function saveOff() {
+  localStorage.setItem(OFF_KEY, JSON.stringify(offDays));
 }
 function loadNotes() {
   try { return JSON.parse(localStorage.getItem(NOTES_KEY)) || []; }
@@ -305,9 +320,26 @@ function addDays(key, n) {
   d.setDate(d.getDate() + n);
   return toKey(d);
 }
-// 시작일을 1일째로 셈: 11/3 시작 + 10일 → 11/12 종료
-function calcEnd(start, days) {
-  return addDays(start, days - 1);
+function diffDays(a, b) {   // a - b (일)
+  return Math.round((fromKey(a) - fromKey(b)) / 86400000);
+}
+// 그 과목이 그날 쉬는 날인지
+function isOff(subject, key) {
+  return !!(offDays[subject] && offDays[subject][key]);
+}
+// key 이후(포함) 처음 오는 공부하는 날
+function nextStudyDay(subject, key) {
+  while (isOff(subject, key)) key = addDays(key, 1);
+  return key;
+}
+// 시작일을 1일째로 세고, 그 과목의 휴일은 건너뜀: 11/3 시작 + 10일, 11/6 휴일 → 11/13 종료
+function calcEnd(start, days, subject) {
+  let d = start, count = 0;
+  while (true) {
+    if (!isOff(subject, d)) count++;
+    if (count === days) return d;
+    d = addDays(d, 1);
+  }
 }
 function shortDate(key) {
   const d = fromKey(key);
@@ -334,9 +366,66 @@ function roundNumbers() {
   return nums;
 }
 
-// key 날짜가 회독 r의 며칠째인지 (시작일 = 1일차)
+// key 날짜가 회독 r의 며칠째인지 (공부한 날만 센 일차, 시작일 = 1일차)
 function dayOfRound(r, key) {
-  return Math.round((fromKey(key) - fromKey(r.start)) / 86400000) + 1;
+  let n = 0;
+  for (let d = r.start; d <= key; d = addDays(d, 1)) {
+    if (!isOff(r.subject, d)) n++;
+  }
+  return n;
+}
+
+// ===== 휴일 변경 → 회독 종료일 재계산 + 뒤 회독 자동 밀기 =====
+// 과목별로 시작일 순서대로 보면서, 앞 회독이 늘거나 줄면
+// 뒤 회독의 시작일을 앞 회독과의 간격(일)을 유지한 채 같이 옮긴다.
+function reflowRounds() {
+  for (const s of SUBJECTS) {
+    const list = rounds
+      .filter(r => r.subject === s.name)
+      .sort((a, b) => a.start.localeCompare(b.start) || a.id - b.id);
+    let prev = null, prevOldEnd = null;
+    for (const r of list) {
+      const oldStart = r.start, oldEnd = r.end;
+      if (prev && oldStart > prevOldEnd) {
+        r.start = addDays(prev.end, diffDays(oldStart, prevOldEnd));
+      }
+      r.start = nextStudyDay(r.subject, r.start);
+      r.end = calcEnd(r.start, r.days, r.subject);
+      prev = r;
+      prevOldEnd = oldEnd;
+    }
+  }
+}
+
+// mutate()로 휴일을 바꾼 뒤 재계산. 2027년 7월을 넘으면 되돌리고 false
+function applyOffChange(mutate) {
+  const backupRounds = JSON.stringify(rounds);
+  const backupOff = JSON.stringify(offDays);
+  mutate();
+  reflowRounds();
+  if (rounds.some(r => r.end > MAX_DATE)) {
+    rounds = JSON.parse(backupRounds);
+    offDays = JSON.parse(backupOff);
+    alert('이 휴일을 넣으면 회독이 ' + MAX_MONTH.year + '년 ' + MAX_MONTH.month + '월을 넘어가서 적용할 수 없어요.');
+    return false;
+  }
+  return true;
+}
+
+function toggleOff(subject) {
+  const key = selectedDate;
+  const ok = applyOffChange(() => {
+    if (!offDays[subject]) offDays[subject] = {};
+    if (offDays[subject][key]) delete offDays[subject][key];
+    else offDays[subject][key] = true;
+  });
+  if (!ok) return;
+  save();
+  saveOff();
+  render();
+  renderOffChips();
+  renderRoundList();
+  updatePreview();
 }
 
 // ===== 화면 그리기 =====
@@ -446,6 +535,11 @@ function renderCalendar() {
       const subj = SUBJECTS[s];
       const rs = subj ? todays.filter(r => r.subject === subj.name) : [];
       if (rs.length === 0) { slots += '<span class="s"></span>'; continue; }
+      if (isOff(subj.name, key)) {   // 쉬는 날: 연한 "휴"
+        const tip = rs.map(r => r.subject + ' ' + nums[r.id] + '회독 · 휴일 (공부 안 하는 날)').join('\n');
+        slots += '<span class="s off" style="color:' + subj.color + '" data-tip="' + tip + '">휴</span>';
+        continue;
+      }
       const tip = rs.map(r => r.subject + ' ' + nums[r.id] + '회독 · ' + dayOfRound(r, key) + '일차 ('
                               + shortDate(r.start) + '~' + shortDate(r.end) + ')').join('\n');
       slots += '<span class="s" style="color:' + subj.color + '" data-tip="' + tip + '">' + dayOfRound(rs[0], key) + '</span>';
@@ -525,7 +619,23 @@ function showTab(tab) {
     renderNotesList();
     document.getElementById('note-text').focus();
   } else {
+    renderOffChips();
     renderRoundList();
+  }
+}
+
+// ===== 회독 탭: 이 날 쉬는 과목 버튼 =====
+function renderOffChips() {
+  const box = document.getElementById('off-chips');
+  box.innerHTML = '';
+  for (const s of SUBJECTS) {
+    const off = isOff(s.name, selectedDate);
+    const b = document.createElement('button');
+    b.textContent = s.name + (off ? ' 휴' : '');
+    b.style.setProperty('--c', s.color);
+    b.classList.toggle('selected', off);
+    b.addEventListener('click', () => toggleOff(s.name));
+    box.appendChild(b);
   }
 }
 
@@ -548,7 +658,8 @@ function renderRoundList() {
     const info = document.createElement('span');
     info.className = 'info';
     info.innerHTML = '<span class="dot" style="background:' + colorOf(r.subject) + ';display:inline-block"></span> '
-      + '<b>' + label + '</b> · ' + dayOfRound(r, selectedDate) + '일차 (' + shortDate(r.start) + '~' + shortDate(r.end) + ')';
+      + '<b>' + label + '</b> · ' + (isOff(r.subject, selectedDate) ? '휴일' : dayOfRound(r, selectedDate) + '일차')
+      + ' (' + shortDate(r.start) + '~' + shortDate(r.end) + ')';
 
     const cont = document.createElement('button');
     cont.textContent = '이어서 다음 회독';
@@ -653,10 +764,16 @@ function updatePreview() {
     addBtn.disabled = true;
     return;
   }
+  // 시작일이 그 과목의 휴일이면 다음 공부하는 날부터 시작
+  const start = nextStudyDay(selectedSubject, selectedDate);
   // 새 회독이 몇 번째가 될지 미리 계산
-  const n = rounds.filter(r => r.subject === selectedSubject && r.start <= selectedDate).length + 1;
-  const end = calcEnd(selectedDate, days);
-  preview.innerHTML = '→ 종료일: <b>' + longDate(end) + '</b> (' + selectedSubject + ' ' + n + '회독)';
+  const n = rounds.filter(r => r.subject === selectedSubject && r.start <= start).length + 1;
+  const end = calcEnd(start, days, selectedSubject);
+  preview.innerHTML = '';
+  if (start !== selectedDate) {
+    preview.innerHTML = shortDate(selectedDate) + '은 ' + selectedSubject + ' 휴일이라 <b>' + shortDate(start) + '</b>부터 시작<br>';
+  }
+  preview.innerHTML += '→ 종료일: <b>' + longDate(end) + '</b> (' + selectedSubject + ' ' + n + '회독)';
   if (end > MAX_DATE) {
     preview.innerHTML += '<br><span style="color:#d93b3b">⚠ 종료일이 ' + MAX_MONTH.year + '년 ' + MAX_MONTH.month + '월을 넘어요. 일수를 줄여 주세요.</span>';
     addBtn.disabled = true;
@@ -668,13 +785,15 @@ function updatePreview() {
 function addRound() {
   const days = getDays();
   if (!selectedSubject || !days) return;
-  if (calcEnd(selectedDate, days) > MAX_DATE) return;
+  const start = nextStudyDay(selectedSubject, selectedDate);
+  const end = calcEnd(start, days, selectedSubject);
+  if (end > MAX_DATE) return;
   rounds.push({
     id: Date.now(),
     subject: selectedSubject,
-    start: selectedDate,
-    end: calcEnd(selectedDate, days),
-    days: days,
+    start: start,
+    end: end,
+    days: days,   // 공부하는 날 기준 일수
   });
   save();
   closeModal();
@@ -692,7 +811,7 @@ function deleteRound(r, label) {
 
 // ===== 이어서 다음 회독: 끝난 다음 날로 날짜 창을 다시 열고 과목/일수를 채움 =====
 function continueRound(r) {
-  const next = addDays(r.end, 1);   // 끝난 다음 날부터
+  const next = nextStudyDay(r.subject, addDays(r.end, 1));   // 끝난 다음 공부하는 날부터
   if (next > MAX_DATE) {
     alert('다음 회독 시작일이 ' + MAX_MONTH.year + '년 ' + MAX_MONTH.month + '월을 넘어서 추가할 수 없어요.');
     return;
