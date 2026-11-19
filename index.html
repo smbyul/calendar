@@ -54,8 +54,16 @@
     font-size: 16px; font-weight: 800; cursor: default;
   }
   .num .s.off { font-size: 13px; opacity: .55; }
-  .off-chips { margin-bottom: 14px; }
-  .off-chips button { padding: 5px 0; font-size: 13px; }
+  /* 휴일 지정: 새 회독 추가 아래의 작고 눈에 덜 띄는 영역 */
+  .off-section { display: flex; align-items: center; gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px dashed #e3e3e3; }
+  .off-label { font-size: 12px; color: #999; white-space: nowrap; }
+  .off-chips { display: flex; gap: 4px; flex-wrap: wrap; }
+  .off-chips button {
+    padding: 2px 8px; font-size: 11px; border-radius: 10px; cursor: pointer;
+    background: #fff; border: 1px solid #ddd; color: #888; font-weight: normal;
+  }
+  .off-chips button:hover { border-color: var(--c); color: var(--c); }
+  .off-chips button.selected { background: var(--c); border-color: var(--c); color: #fff; }
   .num .s[data-tip]:hover { background: #eef0f5; z-index: 20; }
   /* 마우스를 올리면 바로 뜨는 설명 말풍선 */
   .num .s[data-tip]:hover::after {
@@ -199,8 +207,6 @@
 
     <!-- 📚 회독 탭 -->
     <div id="panel-round">
-      <h4 class="sub">이 날 쉬는 과목 (누르면 휴일)</h4>
-      <div id="off-chips" class="subjects off-chips"></div>
       <h4 class="sub">이 날의 회독</h4>
       <ul id="round-list" class="round-list"></ul>
       <div class="new-round">
@@ -218,6 +224,10 @@
         <button id="cancel">취소</button>
         <button id="add" class="primary">추가</button>
       </div>
+      </div>
+      <div class="off-section">
+        <span class="off-label">휴일 지정</span>
+        <div id="off-chips" class="off-chips"></div>
       </div>
     </div>
   </div>
