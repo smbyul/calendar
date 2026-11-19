@@ -232,7 +232,7 @@
       </div>
       <div class="field">
         <label for="days">회독 일수</label>
-        <input type="number" id="days" min="1" value="10"> 일
+        <input type="number" id="days" min="1" value="15"> 일
       </div>
       <p id="preview"></p>
       <div class="actions">
@@ -624,7 +624,7 @@ function openModal(dateKey, preset) {
   selectedDate = dateKey;
   editingRoundId = null;
   selectedSubject = preset ? preset.subject : null;
-  document.getElementById('days').value = preset ? preset.days : 10;
+  document.getElementById('days').value = preset ? preset.days : 15;
   document.getElementById('modal-title').textContent = longDate(dateKey);
   document.querySelectorAll('#subject-buttons button').forEach(b => {
     b.classList.toggle('selected', b.textContent === selectedSubject);
